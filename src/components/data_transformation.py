@@ -1,7 +1,12 @@
 import os
 import sys
-from dataclasses import dataclass
 
+# Ensure project root is in sys.path for direct execution
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
@@ -24,9 +29,9 @@ class DataTransformation:
         self.data_transformation_config = DataTransformationConfig()
 
     def get_data_transformation_object(self):
-        '''
-        This function is responsible for data transformation
-        '''
+        """
+        Configures preprocessing pipelines for numerical and categorical features.
+        """
         try:
             numerical_columns = ["writing_score", "reading_score"]
             categorical_columns = [
@@ -52,11 +57,11 @@ class DataTransformation:
                 ]
             )
 
-            logging.info("Numerical columns standard scaling completed")
-            logging.info("Categorical columns encoding completed")
+            logging.info(f"Numerical columns: {numerical_columns}")
+            logging.info(f"Categorical columns: {categorical_columns}")
 
             preprocessor = ColumnTransformer(
-                [
+                transformers=[
                     ("num_pipeline", num_pipeline, numerical_columns),
                     ("cat_pipeline", cat_pipeline, categorical_columns),
                 ]
@@ -88,9 +93,7 @@ class DataTransformation:
             input_feature_test_df = test_df.drop(columns=[target_column_name], axis=1)
             target_feature_test_df = test_df[target_column_name]
 
-            logging.info(
-                "Applying preprocessing object on training dataframe and testing dataframe."
-            )
+            logging.info("Applying preprocessing object on training and testing dataframes.")
 
             input_feature_train_arr = preprocessing_obj.fit_transform(input_feature_train_df)
             input_feature_test_arr = preprocessing_obj.transform(input_feature_test_df)
@@ -98,9 +101,11 @@ class DataTransformation:
             train_arr = np.c_[
                 input_feature_train_arr, np.array(target_feature_train_df)
             ]
-            test_arr = np.c_[input_feature_test_arr, np.array(target_feature_test_df)]
+            test_arr = np.c_[
+                input_feature_test_arr, np.array(target_feature_test_df)
+            ]
 
-            logging.info("Saved preprocessing object.")
+            logging.info("Saving preprocessing object.")
 
             save_object(
                 file_path=self.data_transformation_config.preprocessor_obj_file_path,
@@ -117,19 +122,34 @@ class DataTransformation:
             raise CustomException(e, sys)
 
 
+# ==========================================
+# MANUAL SETTING / DIRECT EXECUTION
+# ==========================================
 if __name__ == "__main__":
+    # 1. Manual file paths
     train_path = os.path.join("artifacts", "train.csv")
     test_path = os.path.join("artifacts", "test.csv")
-    if not (os.path.exists(train_path) and os.path.exists(test_path)):
-        from src.components.data_ingestion import DataIngestion
-        data_ingestion = DataIngestion()
-        train_path, test_path = data_ingestion.initiate_data_ingestion()
 
-    data_transformation = DataTransformation()
-    train_arr, test_arr, preprocessor_path = data_transformation.initiate_data_transformation(
-        train_path, test_path
+    # 2. Check if train/test artifacts exist; if not, run data ingestion first
+    if not os.path.exists(train_path) or not os.path.exists(test_path):
+        print("Artifacts not found. Running Data Ingestion first...")
+        from src.components.data_ingestion import DataIngestion
+
+        ingestion = DataIngestion()
+        train_path, test_path = ingestion.initiate_data_ingestion()
+        print(f"Data ingestion completed. Train: {train_path}, Test: {test_path}")
+
+    # 3. Trigger Data Transformation manually
+    print("\nStarting Data Transformation with manual settings...")
+    transformation = DataTransformation()
+    train_arr, test_arr, preprocessor_path = transformation.initiate_data_transformation(
+        train_path=train_path,
+        test_path=test_path,
     )
-    print("Data transformation completed successfully!")
-    print(f"Train array shape: {train_arr.shape}")
-    print(f"Test array shape: {test_arr.shape}")
-    print(f"Preprocessor object saved at: {preprocessor_path}")
+
+    print("\n" + "=" * 50)
+    print("DATA TRANSFORMATION COMPLETED SUCCESSFULLY!")
+    print(f"Train Array Shape: {train_arr.shape}")
+    print(f"Test Array Shape:  {test_arr.shape}")
+    print(f"Preprocessor Saved: {preprocessor_path}")
+    print("=" * 50)
